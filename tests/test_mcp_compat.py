@@ -1,13 +1,8 @@
-"""Regression tests for mcp 1.x / 2.x import compatibility.
-
-mcp 2.0 renamed FastMCP to MCPServer and moved Context alongside it. The
-package supports both, so guard that here: a plain rename would silently
-break the other major, which is how the original breakage happened.
-"""
+"""Regression tests for SDK 2 server imports and tool registration."""
 
 
 def test_app_exposes_server_instance():
-    """The server instance imports and registers tools on either mcp major."""
+    """The SDK 2 server instance imports and registers tools."""
     from monarch_mcp_server.app import mcp
 
     assert mcp is not None
@@ -16,7 +11,7 @@ def test_app_exposes_server_instance():
 
 
 def test_context_is_importable():
-    """Context resolves on either mcp major."""
+    """Context resolves from the SDK 2 server module."""
     from monarch_mcp_server import auth
 
     assert auth.Context is not None

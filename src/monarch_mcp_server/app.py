@@ -1,13 +1,10 @@
-"""FastMCP application instance and entry point."""
+"""MCPServer application instance and entry point."""
 
 import argparse
 import logging
 import os
 
-try:  # mcp >= 2.0 renamed FastMCP to MCPServer
-    from mcp.server.mcpserver import MCPServer as FastMCP
-except ImportError:  # mcp < 2.0
-    from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -19,8 +16,8 @@ logger = logging.getLogger(__name__)
 # this to INFO/DEBUG temporarily if you need to trace GraphQL traffic.
 logging.getLogger("gql.transport.aiohttp").setLevel(logging.WARNING)
 
-# Initialize FastMCP server
-mcp = FastMCP("Monarch Money MCP Server")
+# Initialize MCP server
+mcp = MCPServer("Monarch Money MCP Server")
 
 # Must run before the tool modules are imported, since it works by wrapping
 # mcp.tool() and registration happens at import time.
@@ -42,10 +39,12 @@ import monarch_mcp_server.tools  # noqa: E402, F401
 # mcp.run() builds the Starlette app internally, so the builder is wrapped
 # rather than the run path, which leaves the transport selection untouched.
 _build_streamable_http_app = mcp.streamable_http_app
+_http_options = {}
 
 
-def _streamable_http_app_without_slash_redirect():  # type: ignore[no-untyped-def]
-    http_app = _build_streamable_http_app()
+def _streamable_http_app_without_slash_redirect(**kwargs):  # type: ignore[no-untyped-def]
+    app_options = {key: value for key, value in _http_options.items() if key != "port"}
+    http_app = _build_streamable_http_app(**(app_options | kwargs))
     http_app.router.redirect_slashes = False
     return http_app
 
@@ -113,14 +112,18 @@ def main(argv: list[str] | None = None) -> None:
     if not args.host.strip():
         parser.error("HTTP host must not be empty")
 
+    global _http_options
+    _http_options = {}
     if args.transport != "stdio":
         from mcp.server.transport_security import TransportSecuritySettings
 
-        mcp.settings.host = args.host
-        mcp.settings.port = args.port
+        _http_options = {
+            "host": args.host,
+            "port": args.port,
+        }
         # Listening on all interfaces must not disable Host/Origin validation.
         # Remote clients explicitly allow their public hostname (including port).
-        mcp.settings.transport_security = TransportSecuritySettings(
+        _http_options["transport_security"] = TransportSecuritySettings(
             allowed_hosts=[
                 "localhost",
                 "localhost:*",
@@ -154,7 +157,7 @@ def main(argv: list[str] | None = None) -> None:
         if args.transport == "stdio":
             mcp.run()
         else:
-            mcp.run(transport="streamable-http")
+            mcp.run(transport="streamable-http", **_http_options)
     except Exception as e:
         logger.error(f"Failed to run server: {str(e)}")
         raise

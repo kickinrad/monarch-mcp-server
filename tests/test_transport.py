@@ -13,8 +13,7 @@ from monarch_mcp_server import app
 def isolate_transport(monkeypatch):
     for suffix in ("TRANSPORT", "HOST", "PORT", "ALLOWED_HOSTS", "ALLOWED_ORIGINS"):
         monkeypatch.delenv(f"MONARCH_MCP_{suffix}", raising=False)
-    monkeypatch.setattr(app.mcp, "settings", app.mcp.settings.model_copy(deep=True))
-    monkeypatch.setattr(app.mcp, "_session_manager", None)
+    monkeypatch.setattr(app, "_http_options", {})
     run = Mock()
     monkeypatch.setattr(app.mcp, "run", run)
     return run
@@ -34,9 +33,9 @@ def test_environment_configures_http(monkeypatch, isolate_transport):
     )
     monkeypatch.setenv("MONARCH_MCP_ALLOWED_ORIGINS", "https://client.example.com")
     app.main([])
-    isolate_transport.assert_called_once_with(transport="streamable-http")
-    assert (app.mcp.settings.host, app.mcp.settings.port) == ("0.0.0.0", 9000)
-    security = app.mcp.settings.transport_security
+    isolate_transport.assert_called_once_with(transport="streamable-http", **app._http_options)
+    assert (app._http_options["host"], app._http_options["port"]) == ("0.0.0.0", 9000)
+    security = app._http_options["transport_security"]
     assert security.enable_dns_rebinding_protection
     assert "server.lan:9000" in security.allowed_hosts
     assert "https://client.example.com" in security.allowed_origins
@@ -64,9 +63,9 @@ def test_cli_overrides_environment(monkeypatch, isolate_transport):
             "https://client.example.com",
         ]
     )
-    isolate_transport.assert_called_once_with(transport="streamable-http")
-    assert (app.mcp.settings.host, app.mcp.settings.port) == ("0.0.0.0", 9001)
-    security = app.mcp.settings.transport_security
+    isolate_transport.assert_called_once_with(transport="streamable-http", **app._http_options)
+    assert (app._http_options["host"], app._http_options["port"]) == ("0.0.0.0", 9001)
+    security = app._http_options["transport_security"]
     assert "mcp.example.com" in security.allowed_hosts
     assert "server.lan:9001" in security.allowed_hosts
     assert "old.example.com" not in security.allowed_hosts
@@ -168,8 +167,8 @@ def test_http_initialize_list_and_call_tool(mock_monarch_client):
     "headers,status",
     [
         ({"Host": "evil.example"}, 421),
-        ({"Origin": "https://evil.example"}, 400),
-        ({"Origin": "null"}, 400),
+        ({"Origin": "https://evil.example"}, 403),
+        ({"Origin": "null"}, 403),
         ({"Origin": "http://localhost"}, 200),
         ({"Host": "localhost"}, 200),
     ],
