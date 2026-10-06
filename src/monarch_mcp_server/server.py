@@ -30,6 +30,7 @@ from monarch_mcp_server.tools.accounts import (  # noqa: F401
     upload_account_balance_history,
     update_account,
 )
+from monarch_mcp_server.tools.household_capture import get_household_capture  # noqa: F401
 from monarch_mcp_server.tools.transactions import (  # noqa: F401
     get_transactions,
     search_transactions,

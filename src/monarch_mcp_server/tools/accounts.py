@@ -247,7 +247,7 @@ async def refresh_accounts(account_ids: Optional[List[str]] = None) -> str:
 
     Args:
         account_ids: Specific account IDs to refresh. If omitted or empty,
-            refreshes all active, non-hidden accounts.
+            refreshes all non-deactivated accounts, including hidden ones.
     """
     try:
         client = await get_monarch_client()
@@ -256,14 +256,11 @@ async def refresh_accounts(account_ids: Optional[List[str]] = None) -> str:
             account_ids = [
                 a["id"]
                 for a in accounts.get("accounts", [])
-                if (
-                    a.get("isActive", not a.get("deactivatedAt"))
-                    and not a.get("isHidden")
-                )
+                if not a.get("deactivatedAt")
             ]
         if not account_ids:
             return json_success(
-                {"refreshed": [], "message": "No active, visible accounts to refresh"}
+                {"refreshed": [], "message": "No active accounts to refresh"}
             )
         result = await client.request_accounts_refresh(account_ids)
         return json_success(result)

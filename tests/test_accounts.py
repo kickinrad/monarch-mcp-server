@@ -151,12 +151,12 @@ class TestGetAccountHoldings:
 
 
 class TestRefreshAccounts:
-    async def test_auto_discovers_active_visible_accounts(self, mock_monarch_client):
-        """No args → fetch accounts, refresh only active+non-hidden ones."""
+    async def test_auto_discovers_all_non_deactivated_accounts(self, mock_monarch_client):
+        """No args → fetch accounts and include hidden, non-deactivated ones."""
         result = json.loads(await refresh_accounts())
         assert result["requestAccountsRefresh"]["success"] is True
-        # Default fixture: acc-1 active+visible, acc-2 hidden. Only acc-1 refreshes.
-        mock_monarch_client.request_accounts_refresh.assert_awaited_once_with(["acc-1"])
+        # Default fixture: acc-1 visible, acc-2 hidden; both are active.
+        mock_monarch_client.request_accounts_refresh.assert_awaited_once_with(["acc-1", "acc-2"])
 
     async def test_passes_explicit_account_ids(self, mock_monarch_client):
         """Explicit account_ids must be passed through unchanged."""
@@ -169,17 +169,17 @@ class TestRefreshAccounts:
         mock_monarch_client.get_accounts.assert_not_called()
 
     async def test_empty_list_falls_back_to_auto_discover(self, mock_monarch_client):
-        """An empty list is treated as 'refresh all visible', matching no-arg."""
+        """An empty list is treated as 'refresh all active', matching no-arg."""
         await refresh_accounts(account_ids=[])
-        mock_monarch_client.request_accounts_refresh.assert_awaited_once_with(["acc-1"])
+        mock_monarch_client.request_accounts_refresh.assert_awaited_once_with(["acc-1", "acc-2"])
 
-    async def test_no_visible_accounts_returns_graceful_message(
+    async def test_no_active_accounts_returns_graceful_message(
         self, mock_monarch_client
     ):
-        """If every account is hidden or inactive, do not call the upstream API."""
+        """If every account is deactivated, do not call the upstream API."""
         mock_monarch_client.get_accounts.return_value = {
             "accounts": [
-                {"id": "acc-h", "isHidden": True, "deactivatedAt": None},
+                {"id": "acc-h", "isHidden": True, "deactivatedAt": "2025-01-01"},
                 {"id": "acc-d", "isHidden": False, "deactivatedAt": "2025-01-01"},
             ]
         }
